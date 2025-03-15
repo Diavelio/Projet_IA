@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
 
     warnings.filterwarnings('ignore', category=DeprecationWarning)  # Pour ne pas avoir les alertes de bibliothèques
-    drive.mount('/content/drive')  # Acceder au drive
+
 
     #Transformation sequence to resize, crop, convert to tensor, and normalize the images
     transform = transforms.Compose([
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
 
     #Load images from structured directory with automatic labeling based on folder names and apply transformations
-    data_directory = '/content/drive/MyDrive/files/aircraft'
+    data_directory = 'C:\\Users\\romai\\Desktop\\projetIA\\files\\files\\aircraft'
     dataset = datasets.ImageFolder(root=data_directory, transform=transform)
 
 
@@ -76,11 +76,11 @@ if __name__ == '__main__':
 
 
     def display_comparison(original, transformed, title):
-        fig, (ax1, ax2) = plt.subplots(1,2, fig(12,12))
+        fig, (ax1, ax2) = plt.subplots(1,2, figsize=(12,6))
         ax1.imshow(original)
         ax1.set_title('Original')
         ax1.axis('off')
-        ax2.imshow(transformed)
+        ax2.imshow(transformed, cmap = 'gray')
         ax2.set_title(title)
         ax2.axis('off')
         plt.show()
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     num_images = 3
 
     #Create a figure with subplots in a 2x3 configuration
-    #fig, axes = plt.subplots(1, 3, figsize=(15, 10))  #1 row, 3 columns
+    fig, axes = plt.subplots(1, 3, figsize=(12, 6))  #1 row, 3 columns
     axes = axes.flatten()  #Flatten the 2D array of axes into 1D for easier iteration
 
     #Loop through the first six images (or less if the batch is smaller)
