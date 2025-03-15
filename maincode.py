@@ -1,5 +1,5 @@
 # Section des importations
-
+pip install torch
 
 import os
 import torch
