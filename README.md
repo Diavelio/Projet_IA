@@ -15,6 +15,7 @@ Upload les modifications faites en local :
 3 : git push -> écrit et rend disponible le fichier pour tous les collaborateurs du git
 
 /!\ : ne pas push avant d'avoir au préalable pull, pour ne pas écraser d'éventuelles modifications faites par les autres collaborateurs
+/!\ : ne pas faire "git add ." car tous les fichiers seront uploadés, et le site crashera.
 
 git pull -> télécharger la version la plus récente du fichier ouvert 
 
