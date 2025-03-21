@@ -1,0 +1,99 @@
+
+from PIL import Image, ImageEnhance
+import matplotlib.pyplot as plt
+from torchvision import transforms, datasets
+import os
+
+#--------------------Exercice 3------------------------
+
+def display_comparison(original, transformed, title):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+    ax1.imshow(original)
+    ax1.set_title('Original')
+    ax1.axis('off')
+    ax2.imshow(transformed)
+    ax2.set_title(title)
+    ax2.axis('off')
+    plt.show()
+  
+def is_valid_file(filename):
+    return filename.lower().endswith(('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp', '.JPG', '.JPEG'))
+
+
+
+# Load the original image
+original_img = Image.open('/content/drive/MyDrive/files/files/aircraft/real_private_aircraft/pri14.jpg')
+resized_img = original_img.resize((128, 128))  #Resize to 128x128 pixels
+
+display_comparison(original_img, resized_img, 'Resized Image')
+
+from PIL import ImageEnhance
+
+original_img = Image.open('/content/drive/MyDrive/files/files/aircraft/real_private_aircraft/pri15.jpg')
+
+#Brightness enhancement
+enhancer = ImageEnhance.Brightness(original_img)
+bright_img = enhancer.enhance(2.0)  # Increase brightness
+
+#Contrast enhancement
+enhancer = ImageEnhance.Contrast(original_img)
+contrast_img = enhancer.enhance(2.0)  # Increase contrast
+
+display_comparison(original_img, bright_img, 'Brightened Image')
+display_comparison(original_img, contrast_img, 'Enhanced Contrast Image')
+
+# Transformation sequence to resize, crop, convert to tensor, and normalize the images
+transform = transforms.Compose([
+    transforms.Resize(256),  # Resize each image to 256x256 pixels
+    transforms.CenterCrop(224),  # Crop the central 224x224 area
+    transforms.ToTensor(),  # Convert image to a PyTorch tensor
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Normalize tensor data
+])
+
+#Load images from structured directory with automatic labeling based on folder names and apply transformations
+data_directory = '/content/drive/MyDrive/files/files/aircraft'
+dataset = datasets.ImageFolder(root=data_directory, transform=transform)
+
+def flip_horizontal(image):
+    return image.transpose(Image.FLIP_LEFT_RIGHT)
+
+def flip_vertical(image):
+    return image.transpose(Image.FLIP_TOP_BOTTOM)
+
+# Charger l'image originale
+original_img = Image.open('/content/drive/MyDrive/files/files/aircraft/real_private_aircraft/pri16.jpg')
+
+# Retourner l'image horizontalement
+flipped_horizontal_img = flip_horizontal(original_img)
+display_comparison(original_img, flipped_horizontal_img, 'Retournement Horizontal Image')
+
+# Retourner l'image verticalement
+flipped_vertical_img = flip_vertical(original_img)
+display_comparison(original_img, flipped_vertical_img, 'Retournement Vertical Image')
+
+def compare_all_images(directory, transform):
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if is_valid_file(file):
+                file_path = os.path.join(root, file)
+                original_img = Image.open(file_path)
+                
+                # Appliquer les transformations
+                resized_img = original_img.resize((128, 128))
+                bright_img = ImageEnhance.Brightness(original_img).enhance(2.0)
+                contrast_img = ImageEnhance.Contrast(original_img).enhance(2.0)
+                flipped_horizontal_img = flip_horizontal(original_img)
+                flipped_vertical_img = flip_vertical(original_img)
+                
+                # Afficher les comparaisons
+                display_comparison(original_img, resized_img, 'Resized Image')
+                display_comparison(original_img, bright_img, 'Brightened Image')
+                display_comparison(original_img, contrast_img, 'Enhanced Contrast Image')
+                display_comparison(original_img, flipped_horizontal_img, 'Flipped Horizontal Image')
+                display_comparison(original_img, flipped_vertical_img, 'Flipped Vertical Image')
+
+# Utilisation de la fonction
+data_directory = '/content/drive/MyDrive/files/files/aircraft'
+compare_all_images(data_directory, transform)
+
+
