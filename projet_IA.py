@@ -91,8 +91,3 @@ if __name__ == '__main__':
     print(f"\nTotal d'images dans le dataset : {total_images}")
 
 
-
-
-
-    a = 1+1
-    print(a)
