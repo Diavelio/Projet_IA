@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
 
     #Load images from structured directory with automatic labeling based on folder names and apply transformations
-    data_directory = '.\\files\\files\\aircraft' #C:\\Users\\romai\\Desktop\\projetIA
+    data_directory = '.\\files\\aircraft' #C:\\Users\\romai\\Desktop\\projetIA
     dataset = datasets.ImageFolder(root=data_directory, transform=transform)
 
 
@@ -152,6 +152,91 @@ if __name__ == '__main__':
     """
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#--------------------Exercice 2------------------------
+
+
+def plot_channel_correlation(image_array):
+    # Si l'image est en niveaux de gris ou n'a qu'un seul canal
+    if image_array.ndim == 2:
+        # Dupliquer le canal pour créer une image pseudo-3 canaux
+        image_array = np.stack([image_array] * 3, axis=-1)
+        # Alternativement, vous pouvez tracer la corrélation entre deux canaux quelconques s'il s'agit de niveaux de gris
+        # Exemple : Tracer la corrélation entre le canal unique et lui-même
+        # plt.scatter(image_array.flatten(), image_array.flatten(), color='gray', alpha=0.5)
+        # plt.xlabel('Pixel Intensity')
+        # plt.ylabel('Pixel Intensity')
+        # plt.show()
+        # return  # Quitter la fonction
+
+    # Si l'image a 3 canaux (RVB)
+    # Vérifier si l'image a au moins 3 dimensions
+    if image_array.ndim >= 3:
+        red = image_array[:,:,0].flatten()
+        green = image_array[:,:,1].flatten()
+        blue = image_array[:,:,2].flatten()
+        plt.scatter(red, green, color='lime', alpha=0.5)
+        plt.scatter(red, blue, color='aqua', alpha=0.5)
+        plt.scatter(green, blue, color='magenta', alpha=0.5)
+        plt.xlabel('Pixel Intensity')
+        plt.ylabel('Pixel Intensity')
+        plt.show()
+    else:
+        print("L'image n'a pas suffisamment de dimensions pour l'analyse de corrélation des canaux.")
+
+#Ouvrir le fichier image
+#img = Image.open('files/movies/rogerrabbit.jpg')
+# Assurez-vous que img est un tableau tridimensionnel (sinon, la condition ci-dessus le gérera)
+# Convertir l'image PIL en un tableau NumPy si ce n'est pas déjà fait
+#if isinstance(img, Image.Image):
+#    img = np.array(img)
+
+#img = img[1] # en supposant que vous voulez toujours la deuxième image ici
+
+# Charger une image pour le test (remplacez par le chemin de votre image)
+img = Image.open('.\\files\\aircraft\\real_private_aircraft\\pri14.jpg')
+img_array = np.array(img)
+
+plot_channel_correlation(img_array)  # Maintenant, appelez la fonction
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     #--------------------Exercice 3------------------------
 
     def display_comparison(original, transformed, title):
@@ -170,14 +255,14 @@ if __name__ == '__main__':
 
 
     # Load the original image
-    original_img = Image.open('.\\files\\files\\aircraft\\real_private_aircraft\\pri14.jpg')
+    original_img = Image.open('.\\files\\aircraft\\real_private_aircraft\\pri14.jpg')
     resized_img = original_img.resize((128, 128))  #Resize to 128x128 pixels
 
     display_comparison(original_img, resized_img, 'Resized Image')
 
     from PIL import ImageEnhance
 
-    original_img = Image.open('.\\files\\files\\aircraft\\real_private_aircraft\\pri15.jpg')
+    original_img = Image.open('.\\files\\aircraft\\real_private_aircraft\\pri15.jpg')
 
     #Brightness enhancement
     enhancer = ImageEnhance.Brightness(original_img)
@@ -199,7 +284,7 @@ if __name__ == '__main__':
     ])
 
     #Load images from structured directory with automatic labeling based on folder names and apply transformations
-    data_directory = '.\\files\\files\\aircraft'
+    data_directory = '.\\files\\aircraft'
     dataset = datasets.ImageFolder(root=data_directory, transform=transform)
 
     def flip_horizontal(image):
@@ -209,7 +294,7 @@ if __name__ == '__main__':
         return image.transpose(Image.FLIP_TOP_BOTTOM)
 
     # Charger l'image originale
-    original_img = Image.open('.\\files\\files\\aircraft\\real_private_aircraft\\pri16.jpg')
+    original_img = Image.open('.\\files\\aircraft\\real_private_aircraft\\pri16.jpg')
 
     # Retourner l'image horizontalement
     flipped_horizontal_img = flip_horizontal(original_img)
@@ -241,5 +326,5 @@ if __name__ == '__main__':
                     display_comparison(original_img, flipped_vertical_img, 'Flipped Vertical Image')
 
     # Utilisation de la fonction
-    #data_directory = '.\\files\\files\\aircraft'
+    #data_directory = '.\\files\\aircraft'
     #compare_all_images(data_directory, transform)
