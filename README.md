@@ -35,6 +35,8 @@ git pull -> télécharger la version la plus récente du fichier ouvert
 .
 .
 
+Pour les chemins de fichiers, le ".\\fichier" indique qu'il prendra le fichier dans le même dossier que le code
+
 
 git reset --hard HEAD~1       ->   annuler le dernier commit et effacer les modifs
 .
