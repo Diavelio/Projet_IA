@@ -118,7 +118,7 @@ if __name__ == '__main__':
             # Load the original image
 
             original_img = Image.fromarray((img * 255).astype(np.uint8))  #Image.open('/content/drive/MyDrive/files/aircraft/real_private_aircraft/pri14.jpg')
-            resized_img = original_img.resize((500,500))  #Resize to 128x128 pixels
+            resized_img = original_img.resize((128,128))  #Resize to 128x128 pixels
 
             display_comparison(img, resized_img, 'Resized Image')
 
