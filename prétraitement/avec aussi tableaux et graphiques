@@ -8,6 +8,8 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import pandas as pd
+import time
 
 # Vérifier si un GPU est disponible
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,14 +49,18 @@ train_accuracies = []
 all_preds = []
 all_labels = []
 
-# Boucle d'entraînement
 epochs = 10  # Nombre d'époques
+start_time = time.time()
+
+# Boucle d'entraînement
 for epoch in range(epochs):
     model.train()
     running_loss = 0.0
     correct = 0
     total = 0
-    
+    all_preds_epoch = []
+    all_labels_epoch = []
+
     for images, labels in dataloader:
         images, labels = images.to(DEVICE), labels.to(DEVICE)
 
@@ -69,14 +75,21 @@ for epoch in range(epochs):
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
 
-        all_preds.extend(predicted.cpu().numpy())
-        all_labels.extend(labels.cpu().numpy())
+        all_preds_epoch.extend(predicted.cpu().numpy())
+        all_labels_epoch.extend(labels.cpu().numpy())
 
     epoch_loss = running_loss / len(dataloader)
     epoch_acc = 100 * correct / total
     train_losses.append(epoch_loss)
     train_accuracies.append(epoch_acc)
+    all_preds.extend(all_preds_epoch)
+    all_labels.extend(all_labels_epoch)
+
     print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
+
+end_time = time.time()
+training_duration = end_time - start_time
+print(f"Temps total d'entraînement : {training_duration:.2f} secondes")
 
 # Sauvegarde du modèle
 MODEL_PATH = "resnet18_model.pth"
@@ -96,14 +109,14 @@ def predict(image_path):
     return dataset.classes[predicted.item()]
 
 # Interface Streamlit
-st.title("Prédiction d'images avec ResNet18")
+st.title("🧠 Prédiction d'images avec ResNet18")
 
-uploaded_file = st.file_uploader("Choisissez une image", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("📤 Choisissez une image", type=["jpg", "png", "jpeg"])
 if uploaded_file is not None:
     st.image(uploaded_file, caption="Image chargée", use_column_width=True)
-    st.write("Prédiction en cours...")
+    st.write("🔎 Prédiction en cours...")
     prediction = predict(uploaded_file)
-    st.write(f"Classe prédite : {prediction}")
+    st.success(f"✅ Classe prédite : {prediction}")
 
 # Visualisation des métriques
 def plot_training_curves():
@@ -122,7 +135,7 @@ def plot_training_curves():
 
     st.pyplot(fig)
 
-st.subheader("Visualisation de l'entraînement")
+st.subheader("📊 Visualisation de l'entraînement")
 plot_training_curves()
 
 # Matrice de confusion
@@ -133,5 +146,12 @@ def plot_conf_matrix():
     disp.plot(ax=ax, xticks_rotation='vertical')
     st.pyplot(fig)
 
-st.subheader("Matrice de confusion")
+st.subheader("📌 Matrice de confusion")
 plot_conf_matrix()
+
+# Résumé global
+st.subheader("📝 Résumé de l'entraînement")
+st.write(f"- Nombre d'époques : {epochs}")
+st.write(f"- Nombre total d'images : {len(dataset)}")
+st.write(f"- Temps d'entraînement : {training_duration:.2f} secondes")
+st.write(f"- Précision finale : {train_accuracies[-1]:.2f}%")
