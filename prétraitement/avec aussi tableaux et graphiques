@@ -1,0 +1,137 @@
+import torch
+import torch.nn as nn
+import torchvision.models as models
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+from PIL import Image
+import streamlit as st
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+# Vérifier si un GPU est disponible
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Entraînement sur : {DEVICE}")
+
+# Transformation des images
+transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+# Chargement du dataset
+DATA_DIR = "./RSI-CB128"
+dataset = datasets.ImageFolder(root=DATA_DIR, transform=transform)
+
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+# Chargement du modèle ResNet18 pré-entraîné
+model = models.resnet18(pretrained=True)
+
+# Modification de la dernière couche pour correspondre au nombre de classes
+num_ftrs = model.fc.in_features
+model.fc = nn.Linear(num_ftrs, len(dataset.classes))
+
+# Envoi sur le bon device
+model = model.to(DEVICE)
+
+# Définition de la fonction de perte et de l'optimiseur
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+# Suivi des métriques
+train_losses = []
+train_accuracies = []
+all_preds = []
+all_labels = []
+
+# Boucle d'entraînement
+epochs = 10  # Nombre d'époques
+for epoch in range(epochs):
+    model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+    
+    for images, labels in dataloader:
+        images, labels = images.to(DEVICE), labels.to(DEVICE)
+
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+        _, predicted = outputs.max(1)
+        total += labels.size(0)
+        correct += predicted.eq(labels).sum().item()
+
+        all_preds.extend(predicted.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
+
+    epoch_loss = running_loss / len(dataloader)
+    epoch_acc = 100 * correct / total
+    train_losses.append(epoch_loss)
+    train_accuracies.append(epoch_acc)
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
+
+# Sauvegarde du modèle
+MODEL_PATH = "resnet18_model.pth"
+torch.save(model.state_dict(), MODEL_PATH)
+print("Modèle sauvegardé !")
+
+# Fonction pour la prédiction
+def predict(image_path):
+    model.eval()
+    image = Image.open(image_path).convert("RGB")
+    image = transform(image).unsqueeze(0).to(DEVICE)
+
+    with torch.no_grad():
+        output = model(image)
+        _, predicted = torch.max(output, 1)
+
+    return dataset.classes[predicted.item()]
+
+# Interface Streamlit
+st.title("Prédiction d'images avec ResNet18")
+
+uploaded_file = st.file_uploader("Choisissez une image", type=["jpg", "png", "jpeg"])
+if uploaded_file is not None:
+    st.image(uploaded_file, caption="Image chargée", use_column_width=True)
+    st.write("Prédiction en cours...")
+    prediction = predict(uploaded_file)
+    st.write(f"Classe prédite : {prediction}")
+
+# Visualisation des métriques
+def plot_training_curves():
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+    ax[0].plot(train_losses, label='Loss')
+    ax[0].set_title('Courbe de perte')
+    ax[0].set_xlabel('Époques')
+    ax[0].set_ylabel('Loss')
+    ax[0].legend()
+
+    ax[1].plot(train_accuracies, label='Accuracy', color='orange')
+    ax[1].set_title('Courbe de précision')
+    ax[1].set_xlabel('Époques')
+    ax[1].set_ylabel('Accuracy (%)')
+    ax[1].legend()
+
+    st.pyplot(fig)
+
+st.subheader("Visualisation de l'entraînement")
+plot_training_curves()
+
+# Matrice de confusion
+def plot_conf_matrix():
+    cm = confusion_matrix(all_labels, all_preds, labels=range(len(dataset.classes)))
+    fig, ax = plt.subplots(figsize=(12, 12))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=dataset.classes)
+    disp.plot(ax=ax, xticks_rotation='vertical')
+    st.pyplot(fig)
+
+st.subheader("Matrice de confusion")
+plot_conf_matrix()
