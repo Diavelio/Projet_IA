@@ -184,9 +184,34 @@ if __name__ == '__main__':
     ])
 
 
-   #Loading dataset
-    train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
-    test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
+    """
+    ===========================================================================================================
+    modification du train_dataset pour qu'il prenne en compte les sous-classes
+    ===========================================================================================================
+    """
+
+    """
+    ===========================================================================================================
+    fin de modification
+    =================================================================================================
+    """
+
+   #Loading dataset traditional way (superclasses)
+    #train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
+    #test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
+
+    #Loading dataset with subclasses
+    train_dataset = SubclassImageFolder(root_dir=data_directory, transform=train_transform)
+    test_dataset = SubclassImageFolder(root_dir=data_directory, transform=test_transform)
+
+
+    #for path, label in train_dataset.samples:
+    #    print(f"Path: {path}, Label: {label}")
+
+    print("Classes detected in the dataset:")       # Debug to check subclasses
+    print(train_dataset.classes)  # This should list all 45 subclasses
+    print(f"Number of classes: {len(train_dataset.classes)}")  # Should output 45
+
 
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=4)
@@ -195,7 +220,7 @@ if __name__ == '__main__':
     model = resnet18(pretrained=True)
     num_features = model.fc.in_features
     print(f'Numbers of features in last layer of the pretrained model :{num_features}')
-    model.fc = nn.Linear(num_features, 10)  #Adjust for 10 output classes
+    model.fc = nn.Linear(num_features, 45)  #Adjust for 45 output classes
     model = model.to(device)  #Move model to the appropriate device
 
 
@@ -319,7 +344,7 @@ if __name__ == '__main__':
     model = resnet18(pretrained=False) 
     #Adapt it to the number of classes on the last layer
     num_features = model.fc.in_features
-    model.fc = nn.Linear(num_features, 10) 
+    model.fc = nn.Linear(num_features, 45) 
     #Load the model saved
     state_dict = torch.load('model.pth')
     model.load_state_dict(state_dict)
@@ -328,4 +353,86 @@ if __name__ == '__main__':
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%, Test Loss: {test_loss:.4f}")
 
 
-    
+        # Function to plot the confusion matrix
+    def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion Matrix', cmap=plt.cm.Blues):
+        # Normalize the confusion matrix if specified
+        if normalize:
+            cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+        # Print whether the confusion matrix is normalized
+        print("Confusion matrix, without normalization" if not normalize else "Normalized confusion matrix")
+
+        # Plot the confusion matrix
+        plt.figure(figsize=(10, 10))
+        plt.imshow(cm, interpolation='nearest', cmap=cmap)
+        plt.title(title)
+        plt.colorbar()
+        tick_marks = np.arange(len(classes))
+        plt.xticks(tick_marks, classes, rotation=90)
+        plt.yticks(tick_marks, classes)
+
+        # Format the values in the confusion matrix
+        fmt = '.2f' if normalize else 'd'
+        thresh = cm.max() / 2.
+        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            plt.text(j, i, format(cm[i, j], fmt),
+                    horizontalalignment="center",
+                    color="white" if cm[i, j] > thresh else "black")
+
+        plt.tight_layout()
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.show()
+
+    # Calculate and plot the confusion matrix
+    cm = confusion_matrix(all_labels, all_preds)
+    classes = train_dataset.classes  # Use the class names from your dataset
+    plot_confusion_matrix(cm, classes, normalize=False, title='Confusion Matrix')
+
+
+
+
+
+    """
+    ==========================================================================================================
+                                 PARTIE 3 - PREDICTION ET AFFICHAGE DES IMAGES   
+    ==========================================================================================================
+    """
+
+
+
+
+    def predict_and_display(model, data_loader, class_names, device='cuda', num_images=4):
+        model.eval()  #Set the model to evaluation mode
+        model.to(device)
+        
+        with torch.no_grad():  #Turn off gradients to speed up this part
+            for images, labels in data_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                _, predictions = torch.max(outputs, 1)
+                
+                #Select a random subset of images
+                indices = np.random.choice(len(images), num_images, replace=False)
+
+                #Normalize mean and std used for your data
+                mean = np.array([0.1307, 0.1307, 0.1307])
+                std = np.array([0.3081, 0.3081, 0.3081])
+                
+                #Plot the images in the batch, along with predicted and true labels
+                fig, axes = plt.subplots(1, num_images, figsize=(12, 3))
+                for idx, img_idx in enumerate(indices):
+                    image = images[img_idx].cpu().numpy().transpose((1, 2, 0))
+                    image = (image * mean) + std  #Unnormalize if necessary
+                    ax = axes[idx]
+                    ax.imshow(image, cmap='gray')
+                    ax.set_title(f"{class_names[predictions[img_idx]]}\n(True: {class_names[labels[img_idx]]})", 
+                                color=("green" if predictions[img_idx] == labels[img_idx] else "red"))
+                    ax.axis('off')
+                plt.show()
+                
+                #Break after displaying the first batch's selected images
+                break
+
+
+    predict_and_display(model, test_loader, classes, device)
