@@ -8,7 +8,7 @@ if __name__ == '__main__':
 # Section des importations
 
     import os                                                                   # Pour les opérations système
-    import torch                                                                # Pour les réseaux de neurones
+    import torch                                                                # Pour le calcul numérique 
     import warnings                                                             # Pour les avertissements
     import rasterio                                                             # Pour les images
     import numpy as np                                                          # Pour les calculs numériques	
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     from skimage import filters, color                                          # Pour les filtres
     from PIL import ImageEnhance, Image                                         # Pour les images
     from torchvision.models import resnet18                                     # Pour les modèles
-    from torch.utils.data import DataLoader                                     # Pour charger les données
+    from torch.utils.data import DataLoader, random_split                       # Pour charger les données
     from torchvision.utils import make_grid                                     # Pour afficher les images
     import torchvision.transforms as transforms                                 # Pour les transformations
     from torchvision import datasets, transforms, models                        # Pour les modèles
@@ -33,9 +33,26 @@ if __name__ == '__main__':
     from sklearn.metrics import confusion_matrix, accuracy_score                # Pour les métriques    
     from eoreader.bands import RED, GREEN, NDVI, YELLOW, CLOUDS, to_str         # Pour les bandes
 
+    #Function to choose the device
+    def get_device():
+        if torch.cuda.is_available():
+            #Use CUDA device if available
+            return torch.device("cuda"), "GPU"
+        elif torch.backends.mps.is_available():
+            #Use Apple Metal if available on Mac
+            return torch.device("cuda"), "Apple Metal"
+        else:
+            # default to CPU
+            return torch.device("cuda"), "CPU"
+
+    #Setting the device
+    device, device_name = get_device()
+    print(f"Using device: {device_name}")
+
+
     """
     ==========================================================================================================
-                                  PARTIE 1 - AFFICHAGE DES CLASSES ET SOUS-CLASSES
+                            PARTIE 1 - PRETRAITEMENT & AFFICHAGE DES CLASSES ET SOUS-CLASSES
     ==========================================================================================================
     """
     
@@ -91,8 +108,166 @@ if __name__ == '__main__':
     print(f"\nTotal d'images dans le dataset : {total_images}")
 
 
-  """
+    """
     ==========================================================================================================
                                     "     PARTIE 2 - ENTRAINEMENT DU MODÈLE
     ==========================================================================================================
     """
+
+    #DataLoader manages data shuffling and batching automatically
+    batch_size = 32  #Defines how many samples are processed before the model updates
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
+    images, _ = next(iter(data_loader))
+
+    #Display the number of images
+    print("------ IMAGES ------")
+    print(f'Total images: {len(dataset)}')
+    print(f'Size of image: {images.shape}')
+
+    def show_six_images(data_loader, dataset):
+        # Fetch the first batch of images and labels
+        images, classes = next(iter(data_loader))
+
+        # Define the number of images to display
+        num_images = 6
+
+        # Create a figure with subplots in a 2x3 configuration
+        fig, axes = plt.subplots(2, 3, figsize=(10, 10))  # 2 rows, 3 columns
+        axes = axes.flatten()  # Flatten the 2D array of axes into 1D for easier iteration
+
+        # Loop through the first six images (or less if the batch is smaller)
+        for idx, ax in enumerate(axes):
+            if idx < num_images:
+                # Convert the tensor image to a NumPy array for display
+                img = images[idx].permute(1, 2, 0).numpy()  # Change from (C, H, W) to (H, W, C)
+
+                # Display the image
+                ax.imshow(img)
+                ax.set_title(f'Class: {dataset.classes[classes[idx]]}')  # Set the title to the class label
+                ax.axis('off')  # Hide the axes
+            else:
+                ax.axis('off')  # Hide unused subplots
+
+        plt.tight_layout()
+        plt.show()
+
+    show_six_images(data_loader,dataset)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        #Transformations for the training data (with augmentation)
+    train_transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),  #Convert 1 channel grayscale (MNIST) to 3 channel for model ResNet-18 input
+        transforms.RandomRotation(10, fill=(0,0,0)),  #Rotate by up to 10 degrees filling with 0
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),  #Random translation
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081))
+    ])
+
+    #Transformations for the testing data (without augmentation)
+    test_transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),  #Convert 1 channel grayscale (MNIST) to 3 channel for model ResNet-18 input
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081))
+    ])
+
+
+   #Loading dataset
+    train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
+    test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=4)
+
+    #Load a pretrained ResNet-18 model
+    model = resnet18(pretrained=True)
+    num_features = model.fc.in_features
+    print(f'Numbers of features in last layer of the pretrained model :{num_features}')
+    model.fc = nn.Linear(num_features, 10)  #Adjust for 10 output classes
+    model = model.to(device)  #Move model to the appropriate device
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #Define the loss function and the optimizer
+
+    criterion = nn.CrossEntropyLoss()  #Suitable for classification tasks
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)  #Stochastic Gradient Descent
+
+
+
+
+
+    def train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=10):
+        train_losses = []  #List to store average training losses per epoch
+        val_losses = []  #List to store average validation losses per epoch
+
+        #Loop over the dataset for a fixed number of epochs
+        for epoch in range(epochs):
+            model.train()  #Set the model to training mode (enables dropout, batchnorm updates)
+            total_train_loss = 0
+
+            for data, targets in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} (Train)", leave=True):
+                data, targets = data.to(device), targets.to(device)  #Move data to the correct device
+                optimizer.zero_grad()  #Clear gradients before calculating new ones
+                outputs = model(data)  #Forward pass: compute predicted outputs
+                loss = criterion(outputs, targets)  #Calculate loss between predicted and true labels
+                loss.backward()  #Backward pass: compute gradient of the loss wrt model parameters
+                optimizer.step()  #Perform a single optimization step (parameter update)
+
+                #Accumulate the loss over each batch
+                total_train_loss += loss.item()
+            
+            avg_train_loss = total_train_loss / len(train_loader)
+            train_losses.append(avg_train_loss)
+
+            #Validation phase
+            model.eval()  #Set the model to evaluation mode (disables dropout, batchnorm doesn't update)
+            total_val_loss = 0
+
+            with torch.no_grad():  #Disabling gradient calculation for validation (saves memory and computations)
+                for data, targets in tqdm(test_loader, desc="Validating", leave=True):
+                    data, targets = data.to(device), targets.to(device)  #Move data to the correct device
+                    outputs = model(data)  #Forward pass: compute predicted outputs
+                    loss = criterion(outputs, targets)  #Calculate loss between predicted and true labels
+                    
+                    #Accumulate the loss over each batch
+                    total_val_loss += loss.item()
+
+            avg_val_loss = total_val_loss / len(test_loader)
+            val_losses.append(avg_val_loss)
+
+            #Output the average losses for the current epoch
+            print(f'Train Loss: {np.mean(train_losses):.4f}, Validation Loss: {np.mean(val_losses):.4f}')
+            print('---------------------------------------------')
+
+        #Save the model to disk after training is complete
+        torch.save(model.state_dict(), 'model.pth')
+        print('Model saved to model.pth')
+
+        #Return lists of average losses for each epoch for both training and validation
+        return train_losses, val_losses
+    
+    train_losses, val_losses = train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=5)
