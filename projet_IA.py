@@ -271,3 +271,61 @@ if __name__ == '__main__':
         return train_losses, val_losses
     
     train_losses, val_losses = train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=5)
+
+    def plot_training_progress(train_losses, val_losses):
+        epochs = range(1, len(train_losses) + 1)
+        plt.figure(figsize=(10, 5))
+        plt.plot(epochs, train_losses, 'ro-', label='Training Loss')
+        plt.plot(epochs, val_losses, 'bo-', label='Validation Loss')
+        plt.title('Training and Validation Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.show()
+
+    plot_training_progress(train_losses, val_losses)
+
+        #Evaluate the model
+    def evaluate_model(model, test_loader):
+        model.eval()  #Set the model to evaluation mode, which disables dropout and batch normalization
+        model.to(device)
+        val_loss = 0  #Initialize validation loss
+        correct = 0  #Count of correct predictions
+        total = 0  #Total number of examples processed
+        all_preds = []  #List to store all predictions
+        all_labels = []  #List to store all true labels
+
+        with torch.no_grad():  #Disable gradient computation to speed up the process and reduce memory usage
+            for images, labels in test_loader:  #Iterate over all batches in the test dataset
+                images, labels = images.to(device), labels.to(device)  #Move images and labels to the specified device
+                outputs = model(images)  #Compute the model's output
+                loss = criterion(outputs, labels)  #Calculate the loss based on the criterion
+                val_loss += loss.item()  #Accumulate the loss
+
+                _, predicted = torch.max(outputs.data, 1)  #Get the predicted classes (highest output values)
+                total += labels.size(0)  #Update total count of examples
+                correct += (predicted == labels).sum().item()  #Update correct count based on how many predictions match the labels
+
+                all_preds.extend(predicted.cpu().numpy())  #Store predictions in a list
+                all_labels.extend(labels.cpu().numpy())  #Store true labels in a list
+
+        avg_val_loss = val_loss / len(test_loader)  #Calculate average validation loss
+        avg_accuracy = correct / total  #Calculate accuracy as the ratio of correct predictions to total examples
+
+        return avg_val_loss, avg_accuracy, all_preds, all_labels  #Return the computed metrics and lists of predictions and labels
+
+
+    #Import model
+    model = resnet18(pretrained=False) 
+    #Adapt it to the number of classes on the last layer
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features, 10) 
+    #Load the model saved
+    state_dict = torch.load('model.pth')
+    model.load_state_dict(state_dict)
+
+    test_loss, test_accuracy, all_preds, all_labels = evaluate_model(model, test_loader)
+    print(f"Test Accuracy: {test_accuracy * 100:.2f}%, Test Loss: {test_loss:.4f}")
+
+
+    
