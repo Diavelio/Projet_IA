@@ -197,12 +197,12 @@ if __name__ == '__main__':
     """
 
    #Loading dataset traditional way (superclasses)
-    #train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
-    #test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
+    train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
+    test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
 
     #Loading dataset with subclasses
-    train_dataset = SubclassImageFolder(root_dir=data_directory, transform=train_transform)
-    test_dataset = SubclassImageFolder(root_dir=data_directory, transform=test_transform)
+    #train_dataset = SubclassImageFolder(root_dir=data_directory, transform=train_transform)
+    #test_dataset = SubclassImageFolder(root_dir=data_directory, transform=test_transform)
 
 
     #for path, label in train_dataset.samples:
