@@ -1,0 +1,36 @@
+import torch
+import torch.nn as nn
+import torchvision.models as models
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+
+# Vérifier si un GPU est disponible
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Entraînement sur : {DEVICE}")
+
+# Transformation des images
+transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+# Chargement du dataset
+DATA_DIR = "./RSI-CB128"
+dataset = datasets.ImageFolder(root=DATA_DIR, transform=transform)
+
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+# Chargement du modèle ResNet18 pré-entraîné
+model = models.resnet18(pretrained=True)
+
+# Modification de la dernière couche pour correspondre au nombre de classes
+num_ftrs = model.fc.in_features
+model.fc = nn.Linear(num_ftrs, len(dataset.classes))
+
+# Envoi sur le bon device
+model = model.to(DEVICE)
+
+# Affichage de l'architecture modifiée
+print(model)
