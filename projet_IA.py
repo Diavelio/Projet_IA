@@ -25,13 +25,16 @@ if __name__ == '__main__':
     from skimage import filters, color                                          # Pour les filtres
     from PIL import ImageEnhance, Image                                         # Pour les images
     from torchvision.models import resnet18                                     # Pour les modèles
-    from torch.utils.data import DataLoader, random_split                       # Pour charger les données
+    from torch.utils.data import DataLoader, Dataset, random_split                       # Pour charger les données
     from torchvision.utils import make_grid                                     # Pour afficher les images
     import torchvision.transforms as transforms                                 # Pour les transformations
     from torchvision import datasets, transforms, models                        # Pour les modèles
     from torchvision.transforms.functional import to_pil_image                  # Pour convertir un tensor en image
     from sklearn.metrics import confusion_matrix, accuracy_score                # Pour les métriques    
     from eoreader.bands import RED, GREEN, NDVI, YELLOW, CLOUDS, to_str         # Pour les bandes
+
+    from custom_dataset import SubclassImageFolder  # Import the custom dataset class
+
 
     #Function to choose the device
     def get_device():
@@ -152,16 +155,7 @@ if __name__ == '__main__':
         plt.tight_layout()
         plt.show()
 
-    show_six_images(data_loader,dataset)
-
-
-
-
-
-
-
-
-
+   # show_six_images(data_loader,dataset)   # Afficher les 6 premières images du dataset
 
 
 
@@ -189,7 +183,7 @@ if __name__ == '__main__':
     modification du train_dataset pour qu'il prenne en compte les sous-classes
     ===========================================================================================================
     """
-
+    
     """
     ===========================================================================================================
     fin de modification
@@ -197,12 +191,12 @@ if __name__ == '__main__':
     """
 
    #Loading dataset traditional way (superclasses)
-    train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
-    test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
+    #train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
+    #test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
 
     #Loading dataset with subclasses
-    #train_dataset = SubclassImageFolder(root_dir=data_directory, transform=train_transform)
-    #test_dataset = SubclassImageFolder(root_dir=data_directory, transform=test_transform)
+    train_dataset = SubclassImageFolder(root_dir=data_directory, transform=train_transform)
+    test_dataset = SubclassImageFolder(root_dir=data_directory, transform=test_transform)
 
 
     #for path, label in train_dataset.samples:
@@ -356,6 +350,7 @@ if __name__ == '__main__':
         # Function to plot the confusion matrix
     def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion Matrix', cmap=plt.cm.Blues):
         # Normalize the confusion matrix if specified
+        cm = np.array(cm)  # Ensure cm is a numpy array
         if normalize:
             cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 
@@ -363,7 +358,7 @@ if __name__ == '__main__':
         print("Confusion matrix, without normalization" if not normalize else "Normalized confusion matrix")
 
         # Plot the confusion matrix
-        plt.figure(figsize=(10, 10))
+        plt.figure(figsize=(15, 15))  # Adjust figure size for better readability
         plt.imshow(cm, interpolation='nearest', cmap=cmap)
         plt.title(title)
         plt.colorbar()
@@ -377,6 +372,7 @@ if __name__ == '__main__':
         for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
             plt.text(j, i, format(cm[i, j], fmt),
                     horizontalalignment="center",
+                    fontsize=8,  # Adjust font size
                     color="white" if cm[i, j] > thresh else "black")
 
         plt.tight_layout()
@@ -388,6 +384,7 @@ if __name__ == '__main__':
     cm = confusion_matrix(all_labels, all_preds)
     classes = train_dataset.classes  # Use the class names from your dataset
     plot_confusion_matrix(cm, classes, normalize=False, title='Confusion Matrix')
+    plot_confusion_matrix(cm, classes, normalize=True, title='Normalized Confusion Matrix')
 
 
 
