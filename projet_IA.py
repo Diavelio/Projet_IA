@@ -1,6 +1,10 @@
 """
-Fiche de code principale poru le projet IA
+Author : Romain BAHARIAN, Dalyl MOUHAMMADI, Lola MURGATROYD, Dilan GAJASINGHE
+Date : 14/03/2025 - 08/04/2025
+Windows 11, VSCode, python 3.12.3
+
 """
+
 if __name__ == '__main__': 
     from multiprocessing import freeze_support                                  # Pour éviter les erreurs de multiprocessing sous Windows
     freeze_support() 
@@ -25,18 +29,18 @@ if __name__ == '__main__':
     from skimage import filters, color                                          # Pour les filtres
     from PIL import ImageEnhance, Image                                         # Pour les images
     from torchvision.models import resnet18                                     # Pour les modèles
-    from torch.utils.data import DataLoader, Dataset, random_split                       # Pour charger les données
     from torchvision.utils import make_grid                                     # Pour afficher les images
     import torchvision.transforms as transforms                                 # Pour les transformations
     from torchvision import datasets, transforms, models                        # Pour les modèles
     from torchvision.transforms.functional import to_pil_image                  # Pour convertir un tensor en image
     from sklearn.metrics import confusion_matrix, accuracy_score                # Pour les métriques    
+    from torch.utils.data import DataLoader, Dataset, random_split              # Pour charger les données
     from eoreader.bands import RED, GREEN, NDVI, YELLOW, CLOUDS, to_str         # Pour les bandes
 
-    from custom_dataset import SubclassImageFolder  # Import the custom dataset class
+    from custom_dataset import SubclassImageFolder  # Importer la classe custom SubclassImageFolder pour travailler avec les sous-classes
 
 
-    #Function to choose the device
+    #Function to choose the device : CPU, GPU or Apple Metal
     def get_device():
         if torch.cuda.is_available():
             #Use CUDA device if available
@@ -54,12 +58,14 @@ if __name__ == '__main__':
 
 
     """
-    ==========================================================================================================
-                            PARTIE 1 - PRETRAITEMENT & AFFICHAGE DES CLASSES ET SOUS-CLASSES
-    ==========================================================================================================
+    =========================================================================================================================
+    =========================================================================================================================
+                                PARTIE 1 - PRETRAITEMENT & AFFICHAGE DES CLASSES ET SOUS-CLASSES
+    =========================================================================================================================
+    =========================================================================================================================
     """
     
-        #Transformation sequence to resize, crop, convert to tensor, and normalize the images
+        # Transformation sequence to resize, crop, convert to tensor, and normalize the images
     transform = transforms.Compose([
         transforms.Resize(256),  #Resize each image to 256x256 pixels
         transforms.CenterCrop(224),  #Crop the central 224x224 area
@@ -67,20 +73,22 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  #Normalize tensor data
     ])
 
-    #chargement des données
-
     #Load images from structured directory with automatic labeling based on folder names and apply transformations
-    data_directory = '.\\RSI-CB128'
+    data_directory = '.\\RSI-CB128' # Récupération du dossier par le dossier courant (d'ou le .\\)
     dataset = datasets.ImageFolder(root=data_directory, transform=transform)
 
+
+    """
+    -------------------------- Création du dictionnaire pour stocker les classes et sous-classes --------------------------
+    -----------------------------------------------------------------------------------------------------------------------
+    """
 
     # Initialisation du dictionnaire pour stocker les classes et sous-classes
     class_hierarchy = {}
 
     # Parcours des fichiers du dataset
-    for path, index in dataset.samples:  # dataset.samples contient (chemin, index de classe)
-        # Extraire le chemin relatif par rapport au dossier racine
-        relative_path = os.path.relpath(path, data_directory)
+    for path, index in dataset.samples:  # dataset.samples contient (chemin, index de classe)      
+        relative_path = os.path.relpath(path, data_directory) # Extraire le chemin relatif par rapport au dossier racine
 
         # Découper les dossiers pour identifier classe principale et sous-classe
         parts = relative_path.split(os.sep)  # Séparation selon "/"
@@ -99,6 +107,11 @@ if __name__ == '__main__':
         else:
             class_hierarchy[class_principale][sous_classe] = 1
 
+    """
+    --------------------------------- Fin de la création du dictionnaire : affichage --------------------------------
+    -----------------------------------------------------------------------------------------------------------------
+    """
+
     # Affichage de l'organisation des classes et sous-classes
     print("\nOrganisation des classes et sous-classes :")
     for class_principale, sous_classes in class_hierarchy.items():
@@ -113,7 +126,9 @@ if __name__ == '__main__':
 
     """
     ==========================================================================================================
-                                    "     PARTIE 2 - ENTRAINEMENT DU MODÈLE
+    ==========================================================================================================
+                                          PARTIE 2 - ENTRAINEMENT DU MODÈLE
+    ==========================================================================================================
     ==========================================================================================================
     """
 
@@ -121,12 +136,18 @@ if __name__ == '__main__':
     batch_size = 32  #Defines how many samples are processed before the model updates
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-    images, _ = next(iter(data_loader))
+    images, _ = next(iter(data_loader)) 
 
     #Display the number of images
-    print("------ IMAGES ------")
+    print("\n------ RECAP DATA IMAGES ------")
     print(f'Total images: {len(dataset)}')
-    print(f'Size of image: {images.shape}')
+    print(f'Size of image: {images.shape}') # Vérification de la taille des images
+    print("\n")
+
+    """
+    --------------------------------- Affichage de 6 images prétraitées --------------------------------
+    ----------------------------------------------------------------------------------------------------
+    """
 
     def show_six_images(data_loader, dataset):
         # Fetch the first batch of images and labels
@@ -155,11 +176,14 @@ if __name__ == '__main__':
         plt.tight_layout()
         plt.show()
 
-   # show_six_images(data_loader,dataset)   # Afficher les 6 premières images du dataset
+   # show_six_images(data_loader,dataset)   # Afficher 6 images prétraitées du dataset
 
 
 
-
+    """
+    -------------------------------------- Transformation pour modèle -------------------------------------
+    -------------------------------------------------------------------------------------------------------
+    """
 
         #Transformations for the training data (with augmentation)
     train_transform = transforms.Compose([
@@ -177,57 +201,43 @@ if __name__ == '__main__':
         transforms.Normalize((0.1307, 0.1307, 0.1307), (0.3081, 0.3081, 0.3081))
     ])
 
-
     """
-    ===========================================================================================================
-    modification du train_dataset pour qu'il prenne en compte les sous-classes
-    ===========================================================================================================
-    """
-    
-    """
-    ===========================================================================================================
-    fin de modification
-    =================================================================================================
+    ------ Chargement du dataset pour l'entrainement et le test, affichage des classes et sous-classes ---------
+    ------------------------------------------------------------------------------------------------------------
     """
 
-   #Loading dataset traditional way (superclasses)
+    # Loading dataset traditional way (superclasses only) 
     #train_dataset = datasets.ImageFolder(root=data_directory, transform=train_transform)
     #test_dataset = datasets.ImageFolder(root=data_directory, transform=test_transform)
 
-    #Loading dataset with subclasses
+    # Loading dataset with subclasses
     train_dataset = SubclassImageFolder(root_dir=data_directory, transform=train_transform)
     test_dataset = SubclassImageFolder(root_dir=data_directory, transform=test_transform)
 
 
     #for path, label in train_dataset.samples:
-    #    print(f"Path: {path}, Label: {label}")
+    #    print(f"Path: {path}, Label: {label}")  # Affichage des chemins et labels de chaque image
 
     print("Classes detected in the dataset:")       # Debug to check subclasses
     print(train_dataset.classes)  # This should list all 45 subclasses
-    print(f"Number of classes: {len(train_dataset.classes)}")  # Should output 45
+    print(f"\n\nNumber of classes: {len(train_dataset.classes)}\n\n")  # Should output 45
 
 
-    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
+    # Séparation du dataset pour le train et le test (Le shuffle=True permet de mélanger les données)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4) 
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=4)
 
+
+    """
+    ------------------------------------ Importation du modèle de traitement -------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------
+    """
     #Load a pretrained ResNet-18 model
     model = resnet18(pretrained=True)
     num_features = model.fc.in_features
     print(f'Numbers of features in last layer of the pretrained model :{num_features}')
     model.fc = nn.Linear(num_features, 45)  #Adjust for 45 output classes
     model = model.to(device)  #Move model to the appropriate device
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     #Define the loss function and the optimizer
@@ -237,7 +247,10 @@ if __name__ == '__main__':
 
 
 
-
+    """
+    ------------------------------------------ Entrainement du modèle -------------------------------------
+    -------------------------------------------------------------------------------------------------------
+    """
 
     def train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=10):
         train_losses = []  #List to store average training losses per epoch
@@ -344,7 +357,13 @@ if __name__ == '__main__':
     model.load_state_dict(state_dict)
 
     test_loss, test_accuracy, all_preds, all_labels = evaluate_model(model, test_loader)
-    print(f"Test Accuracy: {test_accuracy * 100:.2f}%, Test Loss: {test_loss:.4f}")
+    print(f"Test Accuracy: {test_accuracy * 100:.2f}%, Test Loss: {test_loss:.4f}\n\n")
+
+
+
+    """
+    ----------------------------- Création et affichage de la matrice de confusion ----------------------------
+    """
 
 
         # Function to plot the confusion matrix
@@ -380,7 +399,8 @@ if __name__ == '__main__':
         plt.xlabel('Predicted label')
         plt.show()
 
-    # Calculate and plot the confusion matrix
+
+    # Calcul et affichage de la matrice de confusion
     cm = confusion_matrix(all_labels, all_preds)
     classes = train_dataset.classes  # Use the class names from your dataset
     plot_confusion_matrix(cm, classes, normalize=False, title='Confusion Matrix')
@@ -392,7 +412,9 @@ if __name__ == '__main__':
 
     """
     ==========================================================================================================
+    ==========================================================================================================
                                  PARTIE 3 - PREDICTION ET AFFICHAGE DES IMAGES   
+    ==========================================================================================================
     ==========================================================================================================
     """
 
