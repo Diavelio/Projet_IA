@@ -28,7 +28,7 @@ if __name__ == '__main__':
     from eoreader.reader import Reader                                          # Pour lire les images
     from skimage import filters, color                                          # Pour les filtres
     from PIL import ImageEnhance, Image                                         # Pour les images
-    from torchvision.models import resnet18                                     # Pour les modèles
+    from torchvision.models import resnet18, efficientnet_b0                    # Pour les modèles
     from torchvision.utils import make_grid                                     # Pour afficher les images
     import torchvision.transforms as transforms                                 # Pour les transformations
     from torchvision import datasets, transforms, models                        # Pour les modèles
@@ -233,17 +233,25 @@ if __name__ == '__main__':
     --------------------------------------------------------------------------------------------------------------------
     """
     #Load a pretrained ResNet-18 model
-    model = resnet18(pretrained=True)
-    num_features = model.fc.in_features
+    model1 = resnet18(pretrained=True)
+    num_features = model1.fc.in_features
     print(f'Numbers of features in last layer of the pretrained model :{num_features}')
-    model.fc = nn.Linear(num_features, 45)  #Adjust for 45 output classes
-    model = model.to(device)  #Move model to the appropriate device
+    model1.fc = nn.Linear(num_features, 45)  #Adjust for 45 output classes
+    model1 = model1.to(device)  #Move model to the appropriate device
+
+    # Load a pretrained EfficientNet-B0 model
+    model2 = efficientnet_b0(pretrained=True)
+    num_features = model2.classifier[1].in_features  # Get the number of input features for the classifier
+    model2.classifier[1] = nn.Linear(num_features, 45)  # Adjust for 45 output classes
+    model2 = model2.to(device)  # Move model to the appropriate device
+    print(f'Number of features in the last layer of EfficientNet-B0: {num_features}')
 
 
     #Define the loss function and the optimizer
 
     criterion = nn.CrossEntropyLoss()  #Suitable for classification tasks
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)  #Stochastic Gradient Descent
+    optimizer = optim.SGD(model1.parameters(), lr=0.001, momentum=0.9)  #Stochastic Gradient Descent
+    optimizer = optim.SGD(model2.parameters(), lr=0.001, momentum=0.9)  #Stochastic Gradient Descent
 
 
 
@@ -251,6 +259,7 @@ if __name__ == '__main__':
     ------------------------------------------ Entrainement du modèle -------------------------------------
     -------------------------------------------------------------------------------------------------------
     """
+
 
     def train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=10):
         train_losses = []  #List to store average training losses per epoch
@@ -302,20 +311,33 @@ if __name__ == '__main__':
         #Return lists of average losses for each epoch for both training and validation
         return train_losses, val_losses
     
-    train_losses, val_losses = train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=5)
+    # Train and validate both models
+    results = {}
+    for model_name, model in {"ResNet-18": model1, "EfficientNet-B0": model2}.items():
+        print(f"\nTraining model: {model_name}\n")
+        optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)  # Define optimizer for each model
+        train_losses, val_losses = train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=5)
 
-    def plot_training_progress(train_losses, val_losses):
-        epochs = range(1, len(train_losses) + 1)
+        # Store results for each model
+        results[model_name] = {
+            "train_losses": train_losses,
+            "val_losses": val_losses
+        }
+
+    # Plot training and validation losses for both models
+    def plot_losses(results):
         plt.figure(figsize=(10, 5))
-        plt.plot(epochs, train_losses, 'ro-', label='Training Loss')
-        plt.plot(epochs, val_losses, 'bo-', label='Validation Loss')
-        plt.title('Training and Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
+        for model_name, result in results.items():
+            epochs = range(1, len(result["train_losses"]) + 1)
+            plt.plot(epochs, result["train_losses"], label=f"{model_name} - Train Loss")
+            plt.plot(epochs, result["val_losses"], label=f"{model_name} - Validation Loss")
+        plt.title("Training and Validation Losses")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
         plt.legend()
         plt.show()
 
-    plot_training_progress(train_losses, val_losses)
+    plot_losses(results)
 
         #Evaluate the model
     def evaluate_model(model, test_loader):
@@ -348,18 +370,34 @@ if __name__ == '__main__':
 
 
     #Import model
-    model = resnet18(pretrained=False) 
+    model1 = resnet18(pretrained=False) 
     #Adapt it to the number of classes on the last layer
-    num_features = model.fc.in_features
-    model.fc = nn.Linear(num_features, 45) 
+    num_features = model1.fc.in_features
+    model1.fc = nn.Linear(num_features, 45) 
     #Load the model saved
     state_dict = torch.load('model.pth')
-    model.load_state_dict(state_dict)
+    model1.load_state_dict(state_dict)
 
-    test_loss, test_accuracy, all_preds, all_labels = evaluate_model(model, test_loader)
-    print(f"Test Accuracy: {test_accuracy * 100:.2f}%, Test Loss: {test_loss:.4f}\n\n")
+        #Import model
+    model2 = efficientnet_b0(pretrained=False) 
+    #Adapt it to the number of classes on the last layer
+    num_features = model2.fc.in_features
+    model2.fc = nn.Linear(num_features, 45) 
+    #Load the model saved
+    state_dict = torch.load('model.pth')
+    model2.load_state_dict(state_dict)
 
-
+    # Evaluate both models
+    for model_name, model in {"ResNet-18": model1, "EfficientNet-B0": model2}.items():
+        print(f"\nEvaluating model: {model_name}\n")
+        test_loss, test_accuracy, all_preds, all_labels = evaluate_model(model, test_loader)
+        results[model_name].update({
+            "test_loss": test_loss,
+            "test_accuracy": test_accuracy,
+            "all_preds": all_preds,
+            "all_labels": all_labels
+        })
+        print(f"{model_name} - Test Accuracy: {test_accuracy * 100:.2f}%, Test Loss: {test_loss:.4f}")
 
     """
     ----------------------------- Création et affichage de la matrice de confusion ----------------------------
@@ -400,11 +438,12 @@ if __name__ == '__main__':
         plt.show()
 
 
-    # Calcul et affichage de la matrice de confusion
-    cm = confusion_matrix(all_labels, all_preds)
-    classes = train_dataset.classes  # Use the class names from your dataset
-    plot_confusion_matrix(cm, classes, normalize=False, title='Confusion Matrix')
-    plot_confusion_matrix(cm, classes, normalize=True, title='Normalized Confusion Matrix')
+    # Generate and display confusion matrices
+    for model_name, result in results.items():
+        print(f"\nConfusion Matrix for {model_name}:")
+        cm = confusion_matrix(result["all_labels"], result["all_preds"])
+        plot_confusion_matrix(cm, train_dataset.classes, title=f"{model_name} Confusion Matrix")
+        #plot_confusion_matrix(cm, classes, normalize=True, title='Normalized Confusion Matrix')
 
 
 
