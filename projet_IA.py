@@ -1,5 +1,5 @@
 """
-Author : Romain BAHARIAN, Dalyl MOUHAMMADI, Lola MURGATROYD, Dilan GAJASINGHE
+Authors : Romain BAHARIAN, Dalyl MOUHAMMADI, Lola MURGATROYD, Dilan GAJASINGHE
 Date : 14/03/2025 - 08/04/2025
 Windows 11, VSCode, python 3.12.3
 
@@ -222,10 +222,18 @@ if __name__ == '__main__':
     print(train_dataset.classes)  # This should list all 45 subclasses
     print(f"\n\nNumber of classes: {len(train_dataset.classes)}\n\n")  # Should output 45
 
+    train_size = int(0.7 * len(dataset))  # 70% for training
+    test_size = len(dataset) - train_size  # Remaining 30% for testing
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+    # Print the number of images in each subset
+    print(f"Number of images in the training dataset: {len(train_dataset)}\n")
+    print(f"Number of images in the testing dataset: {len(test_dataset)}\n")
+
 
     # Séparation du dataset pour le train et le test (Le shuffle=True permet de mélanger les données)
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4) 
-    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=4)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=True, num_workers=4)
 
 
     """
@@ -261,54 +269,55 @@ if __name__ == '__main__':
     """
 
 
-    def train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=10):
-        train_losses = []  #List to store average training losses per epoch
-        val_losses = []  #List to store average validation losses per epoch
+    def train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=10, model_name="model"):
+        train_losses = []  # List to store average training losses per epoch
+        val_losses = []  # List to store average validation losses per epoch
 
-        #Loop over the dataset for a fixed number of epochs
+        # Loop over the dataset for a fixed number of epochs
         for epoch in range(epochs):
-            model.train()  #Set the model to training mode (enables dropout, batchnorm updates)
+            model.train()  # Set the model to training mode (enables dropout, batchnorm updates)
             total_train_loss = 0
 
             for data, targets in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} (Train)", leave=True):
-                data, targets = data.to(device), targets.to(device)  #Move data to the correct device
-                optimizer.zero_grad()  #Clear gradients before calculating new ones
-                outputs = model(data)  #Forward pass: compute predicted outputs
-                loss = criterion(outputs, targets)  #Calculate loss between predicted and true labels
-                loss.backward()  #Backward pass: compute gradient of the loss wrt model parameters
-                optimizer.step()  #Perform a single optimization step (parameter update)
+                data, targets = data.to(device), targets.to(device)  # Move data to the correct device
+                optimizer.zero_grad()  # Clear gradients before calculating new ones
+                outputs = model(data)  # Forward pass: compute predicted outputs
+                loss = criterion(outputs, targets)  # Calculate loss between predicted and true labels
+                loss.backward()  # Backward pass: compute gradient of the loss wrt model parameters
+                optimizer.step()  # Perform a single optimization step (parameter update)
 
-                #Accumulate the loss over each batch
+                # Accumulate the loss over each batch
                 total_train_loss += loss.item()
             
             avg_train_loss = total_train_loss / len(train_loader)
             train_losses.append(avg_train_loss)
 
-            #Validation phase
-            model.eval()  #Set the model to evaluation mode (disables dropout, batchnorm doesn't update)
+            # Validation phase
+            model.eval()  # Set the model to evaluation mode (disables dropout, batchnorm doesn't update)
             total_val_loss = 0
 
-            with torch.no_grad():  #Disabling gradient calculation for validation (saves memory and computations)
+            with torch.no_grad():  # Disabling gradient calculation for validation (saves memory and computations)
                 for data, targets in tqdm(test_loader, desc="Validating", leave=True):
-                    data, targets = data.to(device), targets.to(device)  #Move data to the correct device
-                    outputs = model(data)  #Forward pass: compute predicted outputs
-                    loss = criterion(outputs, targets)  #Calculate loss between predicted and true labels
+                    data, targets = data.to(device), targets.to(device)  # Move data to the correct device
+                    outputs = model(data)  # Forward pass: compute predicted outputs
+                    loss = criterion(outputs, targets)  # Calculate loss between predicted and true labels
                     
-                    #Accumulate the loss over each batch
+                    # Accumulate the loss over each batch
                     total_val_loss += loss.item()
 
             avg_val_loss = total_val_loss / len(test_loader)
             val_losses.append(avg_val_loss)
 
-            #Output the average losses for the current epoch
-            print(f'Train Loss: {np.mean(train_losses):.4f}, Validation Loss: {np.mean(val_losses):.4f}')
+            # Output the average losses for the current epoch
+            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
             print('---------------------------------------------')
 
-        #Save the model to disk after training is complete
-        torch.save(model.state_dict(), 'model.pth')
-        print('Model saved to model.pth')
+        # Save the model to disk after training is complete
+        model_filename = f"{model_name.lower().replace('-', '_')}_10.pth"  # Generate a unique filename
+        torch.save(model.state_dict(), model_filename)
+        print(f"Model saved to {model_filename}")
 
-        #Return lists of average losses for each epoch for both training and validation
+        # Return lists of average losses for each epoch for both training and validation
         return train_losses, val_losses
     
     # Train and validate both models
@@ -316,8 +325,7 @@ if __name__ == '__main__':
     for model_name, model in {"ResNet-18": model1, "EfficientNet-B0": model2}.items():
         print(f"\nTraining model: {model_name}\n")
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)  # Define optimizer for each model
-        train_losses, val_losses = train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=5)
-
+        train_losses, val_losses = train_and_validate(model, criterion, optimizer, train_loader, test_loader, epochs=10, model_name=model_name)
         # Store results for each model
         results[model_name] = {
             "train_losses": train_losses,
@@ -375,16 +383,16 @@ if __name__ == '__main__':
     num_features = model1.fc.in_features
     model1.fc = nn.Linear(num_features, 45) 
     #Load the model saved
-    state_dict = torch.load('model.pth')
+    state_dict = torch.load('resnet_18_35.pth')
     model1.load_state_dict(state_dict)
 
         #Import model
     model2 = efficientnet_b0(pretrained=False) 
     #Adapt it to the number of classes on the last layer
-    num_features = model2.fc.in_features
-    model2.fc = nn.Linear(num_features, 45) 
+    num_features = model2.classifier[1].in_features  # Get the number of input features for the classifier
+    model2.classifier[1] = nn.Linear(num_features, 45)  # Replace the final layer with 45 output classes
     #Load the model saved
-    state_dict = torch.load('model.pth')
+    state_dict = torch.load('efficientnet_b0_35.pth')
     model2.load_state_dict(state_dict)
 
     # Evaluate both models
@@ -447,8 +455,6 @@ if __name__ == '__main__':
 
 
 
-
-
     """
     ==========================================================================================================
     ==========================================================================================================
@@ -460,37 +466,121 @@ if __name__ == '__main__':
 
 
 
-    def predict_and_display(model, data_loader, class_names, device='cuda', num_images=4):
-        model.eval()  #Set the model to evaluation mode
+    def predict_and_display(model, data_loader, class_names, device='cuda', num_images=8):
+        """
+        Predict and display a random subset of images with their predicted and true labels.
+        """
+        model.eval()  # Set the model to evaluation mode
         model.to(device)
         
-        with torch.no_grad():  #Turn off gradients to speed up this part
+        with torch.no_grad():  # Turn off gradients to speed up this part
             for images, labels in data_loader:
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
                 _, predictions = torch.max(outputs, 1)
                 
-                #Select a random subset of images
-                indices = np.random.choice(len(images), num_images, replace=False)
+                # Randomize the indices of the images
+                #indices = np.random.choice(len(images), num_images, replace=False)
+                indices = torch.randperm(len(images))[:num_images]  # Select `num_images` random indices
 
-                #Normalize mean and std used for your data
+                # Normalize mean and std used for your data
                 mean = np.array([0.1307, 0.1307, 0.1307])
                 std = np.array([0.3081, 0.3081, 0.3081])
                 
-                #Plot the images in the batch, along with predicted and true labels
-                fig, axes = plt.subplots(1, num_images, figsize=(12, 3))
+                # Plot the images in the batch, along with predicted and true labels
+                fig, axes = plt.subplots(2, 4, figsize=(15, 6))  # 2 rows, 4 columns for 8 images
+                axes = axes.flatten()  # Flatten the 2D array of axes into 1D for easier iteration
                 for idx, img_idx in enumerate(indices):
-                    image = images[img_idx].cpu().numpy().transpose((1, 2, 0))
-                    image = (image * mean) + std  #Unnormalize if necessary
+                    image = images[img_idx].cpu().numpy().transpose((1, 2, 0))  # Convert to (H, W, C)
+                    image = (image * std) + mean  # Unnormalize if necessary
                     ax = axes[idx]
                     ax.imshow(image, cmap='gray')
                     ax.set_title(f"{class_names[predictions[img_idx]]}\n(True: {class_names[labels[img_idx]]})", 
                                 color=("green" if predictions[img_idx] == labels[img_idx] else "red"))
                     ax.axis('off')
+                plt.tight_layout()
                 plt.show()
                 
-                #Break after displaying the first batch's selected images
+                # Break after displaying the first batch's selected images
                 break
 
 
-    predict_and_display(model, test_loader, classes, device)
+    # Display 8 random predictions for each model
+    for model_name, model in {"ResNet-18": model1, "EfficientNet-B0": model2}.items():
+        print(f"\nDisplaying predictions for {model_name}:\n")
+        predict_and_display(model, test_loader, train_dataset.classes, device=device, num_images=8)
+
+
+    """
+    ==========================================================================================================
+    ==========================================================================================================
+                             PARTIE 4 - PREDICTION ET AFFICHAGE D'AUTRES IMAGES 
+    ==========================================================================================================
+    ==========================================================================================================
+    """
+
+
+        # Function to predict the class of a single image
+    def predict_image(image_path, model, class_names, device='cuda'):
+        """
+        Predict the class of a single image using the given model.
+        """
+        # Load the image
+        image = Image.open(image_path).convert('RGB')
+
+        # Define the same transformations used during training
+        transform = transforms.Compose([
+            transforms.Resize(256),  # Resize to 256x256
+            transforms.CenterCrop(224),  # Crop the central 224x224 area
+            transforms.ToTensor(),  # Convert to tensor
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Normalize
+        ])
+
+        # Apply transformations
+        image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension and move to device
+
+        # Set the model to evaluation mode
+        model.eval()
+
+        # Perform prediction
+        with torch.no_grad():
+            outputs = model(image_tensor)
+            _, predicted = torch.max(outputs, 1)  # Get the class index with the highest score
+
+        # Get the class name
+        predicted_class = class_names[predicted.item()]
+        return predicted_class, image
+
+    # Function to predict and display results for all images in a folder
+    def predict_images_in_folder(folder_path, models, class_names, device='cuda'):
+        """
+        Predict and display the class of all images in a folder using the given models.
+        """
+        image_files = [f for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+
+        for image_file in image_files:
+            image_path = os.path.join(folder_path, image_file)
+            print(f"\nPredicting for image: {image_file}")
+
+            # Predict using both models
+            for model_name, model in models.items():
+                predicted_class, image = predict_image(image_path, model, class_names, device)
+                print(f"{model_name} Prediction: {predicted_class}")
+
+                # Display the image with the prediction
+                plt.imshow(image)
+                plt.title(f"{model_name} Prediction: {predicted_class}")
+                plt.axis('off')
+                plt.show()
+
+    # Path to the folder containing images
+    folder_path = '.\\predictions'
+
+    # Dictionary of models
+    models = {
+        "ResNet-18": model1,
+        "EfficientNet-B0": model2
+    }
+
+    # Predict and display results for all images in the folder
+    predict_images_in_folder(folder_path, models, train_dataset.classes, device=device)
